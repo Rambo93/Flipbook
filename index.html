@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>The Little Light That Grew – Flipbook</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/stpageflip/dist/css/stpageflip.min.css">
+  <style>
+    body { margin:0; background:#0c1230; font-family: system-ui, Arial, sans-serif; }
+    #flipbook { width: 100vw; height: 100vh; }
+    .page {
+      display:flex; align-items:center; justify-content:center;
+      width:100%; height:100%; background:linear-gradient(180deg,#101a45,#0c1230);
+      color:#fff; padding:40px; box-sizing:border-box; text-align:center;
+    }
+    .page h1 { font-size:2rem; margin:0 0 1rem; }
+    .page p { font-size:1.1rem; line-height:1.5; }
+    .glow { text-shadow: 0 0 12px rgba(255,200,80,.8), 0 0 28px rgba(255,160,40,.5); color:#ffd27a; }
+    .credit { position:fixed; bottom:8px; right:12px; color:#9ab; font-size:.8rem; }
+  </style>
+</head>
+<body>
+  <div id="flipbook"></div>
+  <div class="credit">Tap/drag corners to flip • Share this URL</div>
+  <script src="https://unpkg.com/stpageflip/dist/js/stpageflip.min.js"></script>
+  <script>
+    const pages = [
+      { title: "The Little Light That Grew", text: "", cover:true },
+      { text: "In a quiet village, a little lantern wished it could brighten the night." },
+      { text: "“You’re enough,” a child whispered. The lantern warmed a little.", glow:true },
+      { text: "Each evening, it glowed for whoever passed by." },
+      { text: "It helped small moments—naps, notes, and gentle goodnights." },
+      { text: "On windy nights, it trembled—but kept shining." },
+      { text: "One by one, others caught the light and shared it.", glow:true },
+      { text: "Together, small lights made a bright welcome.", glow:true },
+      { text: "Morning found a village changed—by one little light that kept showing up." }
+    ];
+
+    const container = document.getElementById('flipbook');
+    const flip = new StPageFlip(container, {
+      width: 600,
+      height: 800,
+      size: 'stretch',
+      maxShadowOpacity: 0.3,
+      mobileScrollSupport: true,
+      drawShadow: true,
+      showCover: true
+    });
+
+    function makePage(content){
+      const el = document.createElement('div');
+      el.className = 'page';
+      el.innerHTML = content;
+      return el;
+    }
+
+    const pageEls = pages.map((p,i)=>{
+      if (p.cover) {
+        return makePage(`<div><h1 class="glow">${p.title}</h1><p>by [Your Name]</p></div>`);
+      }
+      const cls = p.glow ? ' class="glow"' : '';
+      return makePage(`<div><p${cls}>${p.text}</p></div>`);
+    });
+
+    flip.loadFromHTML(pageEls);
+  </script>
+</body>
+</html>
