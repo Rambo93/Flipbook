@@ -6,66 +6,30 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <link rel="stylesheet" href="https://unpkg.com/stpageflip/dist/css/stpageflip.min.css">
   <style>
-    :root {
-      --bg:#0c1230;
-      --bg2:#101a45;
-      --text:#ffffff;
-      --accent:#ffd27a;
-      --muted:#9ab;
-    }
+    :root { --bg:#0c1230; --bg2:#101a45; --text:#ffffff; --accent:#ffd27a; --muted:#9ab; }
     html,body { height:100%; }
-    body {
-      margin:0; background:var(--bg); color:var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-      overflow:hidden;
-    }
+    body { margin:0; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; overflow:hidden; }
     #app { position:fixed; inset:0; display:grid; place-items:center; }
     #flipbook { width:min(100vw,1200px); height:min(100vh,90vh); }
-    .page {
-      display:flex; align-items:center; justify-content:center;
-      width:100%; height:100%;
-      background:linear-gradient(180deg,var(--bg2),var(--bg));
-      color:var(--text); padding:40px; box-sizing:border-box; text-align:center;
-    }
+    /* Page styling */
+    .page { display:flex; align-items:center; justify-content:center; width:100%; height:100%;
+      background:linear-gradient(180deg,var(--bg2),var(--bg)); color:var(--text); padding:40px; box-sizing:border-box; text-align:center; }
     .page h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); margin:0 0 1rem; }
     .page p { font-size: clamp(1rem, 2.5vw, 1.25rem); line-height:1.6; margin:0; }
     .glow { text-shadow: 0 0 12px rgba(255,200,80,.8), 0 0 28px rgba(255,160,40,.5); color:var(--accent); }
 
     /* UI */
-    .ui {
-      position:fixed; inset:0; pointer-events:none;
-    }
-    .btn {
-      position:absolute; top:50%; transform:translateY(-50%);
-      background:rgba(255,255,255,0.08);
-      border:1px solid rgba(255,255,255,0.18);
-      color:#fff; padding:10px 14px; border-radius:10px;
-      cursor:pointer; pointer-events:auto;
-      backdrop-filter: blur(6px);
-      user-select:none;
-      transition:background .15s, transform .1s;
-    }
-    .btn:hover { background:rgba(255,255,255,0.14); }
-    .btn:active { transform:translateY(-50%) scale(0.98); }
-    .btn.prev { left:14px; }
-    .btn.next { right:14px; }
-    .hint, .pagecount {
-      position:fixed; left:50%; transform:translateX(-50%);
-      color:var(--muted); font-size:.9rem; pointer-events:none;
-      text-align:center;
-      text-shadow: 0 1px 2px rgba(0,0,0,.25);
-    }
-    .hint { bottom:10px; }
-    .pagecount { top:10px; background:rgba(0,0,0,.2); padding:4px 10px; border-radius:999px; }
-    /* Make whole screen tappable to advance */
-    .tap-advance {
-      position:fixed; inset:0; pointer-events:auto; background:transparent;
-    }
-    /* Prefer-reduced-motion users: turn off page shadows and hints */
-    @media (prefers-reduced-motion: reduce) {
-      .hint { display:none; }
-    }
+    .ui { position:fixed; inset:0; pointer-events:none; }
+    .btn { position:absolute; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.18); color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; pointer-events:auto; backdrop-filter: blur(6px); user-select:none; }
+    .btn.prev { left:14px; } .btn.next { right:14px; }
+    .hint, .pagecount { position:fixed; left:50%; transform:translateX(-50%); color:var(--muted); font-size:.9rem; pointer-events:none; text-align:center; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+    .hint { bottom:10px; } .pagecount { top:10px; background:rgba(0,0,0,.2); padding:4px 10px; border-radius:999px; }
+    .tap-advance { position:fixed; inset:0; pointer-events:auto; background:transparent; }
+    @media (prefers-reduced-motion: reduce) { .hint { display:none; } }
+
+    /* Hidden source container for pages (required by loadFromHTML) */
+    #pagesSource { display:none; }
   </style>
 </head>
 <body>
@@ -82,6 +46,9 @@
     <div class="tap-advance" id="tapAdvance"></div>
   </div>
 
+  <!-- Hidden container that will hold actual page elements -->
+  <div id="pagesSource"></div>
+
   <script src="https://unpkg.com/stpageflip/dist/js/stpageflip.min.js"></script>
   <script>
     // Content
@@ -97,20 +64,23 @@
       { text: "Morning found a village changed—by one little light that kept showing up." }
     ];
 
-    // Build page elements
-    function makePage(content){
-      const el = document.createElement('div');
-      el.className = 'page';
-      el.innerHTML = content;
-      return el;
-    }
-    const pageEls = pages.map((p)=>{
-      if (p.cover) return makePage(`<div><h1 class="glow">${p.title}</h1><p>by You</p></div>`);
-      const cls = p.glow ? ' class="glow"' : '';
-      return makePage(`<div><p${cls}>${p.text}</p></div>`);
+    // Build real DOM nodes inside #pagesSource so loadFromHTML can parse them
+    const source = document.getElementById('pagesSource');
+    pages.forEach(p => {
+      const page = document.createElement('div');
+      page.className = 'page';
+      if (p.cover) {
+        page.innerHTML = `<div><h1 class="glow">${p.title}</h1><p>by You</p></div>`;
+        // Mark cover per library expectations
+        page.setAttribute('data-density', 'hard'); // optional but nice for cover
+      } else {
+        const cls = p.glow ? ' class="glow"' : '';
+        page.innerHTML = `<div><p${cls}>${p.text}</p></div>`;
+      }
+      source.appendChild(page);
     });
 
-    // Initialize flipbook
+    // Init flipbook
     const container = document.getElementById('flipbook');
     const flip = new StPageFlip(container, {
       width: 600,
@@ -120,9 +90,11 @@
       mobileScrollSupport: true,
       drawShadow: true,
       showCover: true,
-      useMouseEvents: false // we'll handle clicks/swipes
+      useMouseEvents: false
     });
-    flip.loadFromHTML(pageEls);
+
+    // Load pages from the hidden DOM container
+    flip.loadFromHTML(document.querySelectorAll('#pagesSource .page'));
 
     // UI Controls
     const prevBtn = document.querySelector('.btn.prev');
@@ -131,10 +103,9 @@
     const tapAdvance = document.getElementById('tapAdvance');
 
     function updateCounter() {
-      const state = flip.getCurrentPageIndex(); // 0-based sheet index; cover counts
-      const total = flip.getPageCount();
-      // Convert to human-friendly 1..N
-      pageCountEl.textContent = `${state + 1}/${total}`;
+      const index = flip.getCurrentPageIndex(); // 0-based visible page index
+      const total = flip.getPageCount();        // total pages
+      pageCountEl.textContent = `${index + 1}/${total}`;
     }
 
     flip.on('flip', updateCounter);
@@ -144,8 +115,8 @@
     prevBtn.addEventListener('click', (e)=>{ e.stopPropagation(); flip.flipPrev(); });
     nextBtn.addEventListener('click', (e)=>{ e.stopPropagation(); flip.flipNext(); });
 
-    // Tap/click anywhere to go next (except when selecting text)
-    tapAdvance.addEventListener('click', (e)=>{
+    // Tap/click anywhere to go next (unless selecting text)
+    tapAdvance.addEventListener('click', ()=>{
       const selection = window.getSelection && window.getSelection().toString();
       if (!selection) flip.flipNext();
     });
@@ -158,36 +129,21 @@
       if (e.key === 'End') flip.turnToPage(flip.getPageCount() - 1);
     });
 
-    // Touch swipe (simple threshold)
-    let touchStartX = null, touchStartY = null, touchTime = 0;
-    function onTouchStart(e){
-      const t = e.changedTouches[0];
-      touchStartX = t.clientX; touchStartY = t.clientY; touchTime = Date.now();
-    }
-    function onTouchEnd(e){
-      if (touchStartX === null) return;
-      const t = e.changedTouches[0];
-      const dx = t.clientX - touchStartX;
-      const dy = t.clientY - touchStartY;
-      const dt = Date.now() - touchTime;
+    // Touch swipe
+    let sx=null, sy=null, t0=0;
+    document.addEventListener('touchstart', (e)=>{ const t=e.changedTouches[0]; sx=t.clientX; sy=t.clientY; t0=Date.now(); }, {passive:true});
+    document.addEventListener('touchend', (e)=>{
+      if (sx==null) return;
+      const t=e.changedTouches[0]; const dx=t.clientX-sx; const dy=t.clientY-sy; const dt=Date.now()-t0;
+      if (Math.abs(dx)>40 && Math.abs(dx)>Math.abs(dy) && dt<600) { dx<0 ? flip.flipNext() : flip.flipPrev(); }
+      sx=sy=null;
+    }, {passive:true});
 
-      const absX = Math.abs(dx), absY = Math.abs(dy);
-      const isSwipe = absX > 40 && absX > absY && dt < 600;
-      if (isSwipe) {
-        if (dx < 0) flip.flipNext(); else flip.flipPrev();
-      }
-      touchStartX = touchStartY = null;
-    }
-    document.addEventListener('touchstart', onTouchStart, {passive:true});
-    document.addEventListener('touchend', onTouchEnd, {passive:true});
+    // Ensure proper layout on resize
+    window.addEventListener('resize', ()=> flip.update());
 
-    // Resize handling (ensures proper sizing)
-    window.addEventListener('resize', ()=>{
-      flip.update();
-    });
-
-    // Initialize counter after first render
-    setTimeout(updateCounter, 100);
+    // Kick initial counter after render
+    flip.on('init', ()=> setTimeout(updateCounter, 50));
   </script>
 </body>
 </html>
