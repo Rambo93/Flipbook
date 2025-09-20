@@ -3,27 +3,88 @@
 <head>
   <meta charset="utf-8">
   <title>The Little Light That Grew – Flipbook</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <link rel="stylesheet" href="https://unpkg.com/stpageflip/dist/css/stpageflip.min.css">
   <style>
-    body { margin:0; background:#0c1230; font-family: system-ui, Arial, sans-serif; }
-    #flipbook { width: 100vw; height: 100vh; }
+    :root {
+      --bg:#0c1230;
+      --bg2:#101a45;
+      --text:#ffffff;
+      --accent:#ffd27a;
+      --muted:#9ab;
+    }
+    html,body { height:100%; }
+    body {
+      margin:0; background:var(--bg); color:var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      overflow:hidden;
+    }
+    #app { position:fixed; inset:0; display:grid; place-items:center; }
+    #flipbook { width:min(100vw,1200px); height:min(100vh,90vh); }
     .page {
       display:flex; align-items:center; justify-content:center;
-      width:100%; height:100%; background:linear-gradient(180deg,#101a45,#0c1230);
-      color:#fff; padding:40px; box-sizing:border-box; text-align:center;
+      width:100%; height:100%;
+      background:linear-gradient(180deg,var(--bg2),var(--bg));
+      color:var(--text); padding:40px; box-sizing:border-box; text-align:center;
     }
-    .page h1 { font-size:2rem; margin:0 0 1rem; }
-    .page p { font-size:1.1rem; line-height:1.5; }
-    .glow { text-shadow: 0 0 12px rgba(255,200,80,.8), 0 0 28px rgba(255,160,40,.5); color:#ffd27a; }
-    .credit { position:fixed; bottom:8px; right:12px; color:#9ab; font-size:.8rem; }
+    .page h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); margin:0 0 1rem; }
+    .page p { font-size: clamp(1rem, 2.5vw, 1.25rem); line-height:1.6; margin:0; }
+    .glow { text-shadow: 0 0 12px rgba(255,200,80,.8), 0 0 28px rgba(255,160,40,.5); color:var(--accent); }
+
+    /* UI */
+    .ui {
+      position:fixed; inset:0; pointer-events:none;
+    }
+    .btn {
+      position:absolute; top:50%; transform:translateY(-50%);
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.18);
+      color:#fff; padding:10px 14px; border-radius:10px;
+      cursor:pointer; pointer-events:auto;
+      backdrop-filter: blur(6px);
+      user-select:none;
+      transition:background .15s, transform .1s;
+    }
+    .btn:hover { background:rgba(255,255,255,0.14); }
+    .btn:active { transform:translateY(-50%) scale(0.98); }
+    .btn.prev { left:14px; }
+    .btn.next { right:14px; }
+    .hint, .pagecount {
+      position:fixed; left:50%; transform:translateX(-50%);
+      color:var(--muted); font-size:.9rem; pointer-events:none;
+      text-align:center;
+      text-shadow: 0 1px 2px rgba(0,0,0,.25);
+    }
+    .hint { bottom:10px; }
+    .pagecount { top:10px; background:rgba(0,0,0,.2); padding:4px 10px; border-radius:999px; }
+    /* Make whole screen tappable to advance */
+    .tap-advance {
+      position:fixed; inset:0; pointer-events:auto; background:transparent;
+    }
+    /* Prefer-reduced-motion users: turn off page shadows and hints */
+    @media (prefers-reduced-motion: reduce) {
+      .hint { display:none; }
+    }
   </style>
 </head>
 <body>
-  <div id="flipbook"></div>
-  <div class="credit">Tap/drag corners to flip • Share this URL</div>
+  <div id="app">
+    <div id="flipbook" aria-label="Flipbook"></div>
+  </div>
+
+  <!-- UI overlay -->
+  <div class="ui" aria-hidden="true">
+    <div class="btn prev" title="Previous (Left Arrow)">◄</div>
+    <div class="btn next" title="Next (Right Arrow)">►</div>
+    <div class="pagecount" id="pagecount">1/1</div>
+    <div class="hint">Tap/click anywhere, swipe left/right, or use ◄ ►</div>
+    <div class="tap-advance" id="tapAdvance"></div>
+  </div>
+
   <script src="https://unpkg.com/stpageflip/dist/js/stpageflip.min.js"></script>
   <script>
+    // Content
     const pages = [
       { title: "The Little Light That Grew", text: "", cover:true },
       { text: "In a quiet village, a little lantern wished it could brighten the night." },
@@ -36,33 +97,97 @@
       { text: "Morning found a village changed—by one little light that kept showing up." }
     ];
 
-    const container = document.getElementById('flipbook');
-    const flip = new StPageFlip(container, {
-      width: 600,
-      height: 800,
-      size: 'stretch',
-      maxShadowOpacity: 0.3,
-      mobileScrollSupport: true,
-      drawShadow: true,
-      showCover: true
-    });
-
+    // Build page elements
     function makePage(content){
       const el = document.createElement('div');
       el.className = 'page';
       el.innerHTML = content;
       return el;
     }
-
-    const pageEls = pages.map((p,i)=>{
-      if (p.cover) {
-        return makePage(`<div><h1 class="glow">${p.title}</h1><p>by [Your Name]</p></div>`);
-      }
+    const pageEls = pages.map((p)=>{
+      if (p.cover) return makePage(`<div><h1 class="glow">${p.title}</h1><p>by You</p></div>`);
       const cls = p.glow ? ' class="glow"' : '';
       return makePage(`<div><p${cls}>${p.text}</p></div>`);
     });
 
+    // Initialize flipbook
+    const container = document.getElementById('flipbook');
+    const flip = new StPageFlip(container, {
+      width: 600,
+      height: 800,
+      size: 'stretch',
+      maxShadowOpacity: 0.25,
+      mobileScrollSupport: true,
+      drawShadow: true,
+      showCover: true,
+      useMouseEvents: false // we'll handle clicks/swipes
+    });
     flip.loadFromHTML(pageEls);
+
+    // UI Controls
+    const prevBtn = document.querySelector('.btn.prev');
+    const nextBtn = document.querySelector('.btn.next');
+    const pageCountEl = document.getElementById('pagecount');
+    const tapAdvance = document.getElementById('tapAdvance');
+
+    function updateCounter() {
+      const state = flip.getCurrentPageIndex(); // 0-based sheet index; cover counts
+      const total = flip.getPageCount();
+      // Convert to human-friendly 1..N
+      pageCountEl.textContent = `${state + 1}/${total}`;
+    }
+
+    flip.on('flip', updateCounter);
+    flip.on('init', updateCounter);
+
+    // Buttons
+    prevBtn.addEventListener('click', (e)=>{ e.stopPropagation(); flip.flipPrev(); });
+    nextBtn.addEventListener('click', (e)=>{ e.stopPropagation(); flip.flipNext(); });
+
+    // Tap/click anywhere to go next (except when selecting text)
+    tapAdvance.addEventListener('click', (e)=>{
+      const selection = window.getSelection && window.getSelection().toString();
+      if (!selection) flip.flipNext();
+    });
+
+    // Keyboard
+    window.addEventListener('keydown', (e)=>{
+      if (e.key === 'ArrowRight') flip.flipNext();
+      if (e.key === 'ArrowLeft') flip.flipPrev();
+      if (e.key === 'Home') flip.turnToPage(0);
+      if (e.key === 'End') flip.turnToPage(flip.getPageCount() - 1);
+    });
+
+    // Touch swipe (simple threshold)
+    let touchStartX = null, touchStartY = null, touchTime = 0;
+    function onTouchStart(e){
+      const t = e.changedTouches[0];
+      touchStartX = t.clientX; touchStartY = t.clientY; touchTime = Date.now();
+    }
+    function onTouchEnd(e){
+      if (touchStartX === null) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touchStartX;
+      const dy = t.clientY - touchStartY;
+      const dt = Date.now() - touchTime;
+
+      const absX = Math.abs(dx), absY = Math.abs(dy);
+      const isSwipe = absX > 40 && absX > absY && dt < 600;
+      if (isSwipe) {
+        if (dx < 0) flip.flipNext(); else flip.flipPrev();
+      }
+      touchStartX = touchStartY = null;
+    }
+    document.addEventListener('touchstart', onTouchStart, {passive:true});
+    document.addEventListener('touchend', onTouchEnd, {passive:true});
+
+    // Resize handling (ensures proper sizing)
+    window.addEventListener('resize', ()=>{
+      flip.update();
+    });
+
+    // Initialize counter after first render
+    setTimeout(updateCounter, 100);
   </script>
 </body>
 </html>
